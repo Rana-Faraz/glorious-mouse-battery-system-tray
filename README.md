@@ -1,24 +1,31 @@
-# Model D2 Pro Battery Monitor
+# Glorious Mouse Battery Monitor
 
-A lightweight Windows system tray application that monitors the battery level of your Glorious Model D2 Pro Wireless gaming mouse.
+A lightweight Windows system tray application that monitors the battery level of your Glorious gaming mice.
 
 ![Battery Monitor](https://img.shields.io/badge/Status-Active-green)
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue)
 
 ## Features
 
-- 🔋 **Real-time Battery Monitoring** - Displays battery percentage with dynamic icons
-- ⚡ **Charging Status** - Shows when the mouse is charging vs. on battery
-- 🎨 **Visual Battery Indicators** - Color-coded icons (red/orange/yellow/green) based on battery level
+- 🔋 **Real-time Battery Monitoring** - Displays battery percentage as text in system tray (e.g., "68", "100")
+- 🎯 **Automatic Mouse Detection** - Automatically detects and displays the correct mouse model name
+- 📱 **Dynamic Mouse Names** - Shows accurate mouse model name in tooltips and context menu (Model O Wired, Model O Wireless, Model O PRO Wireless, Model D 2 PRO Wireless)
+- ⚡ **Charging Status** - Displays when the mouse is charging vs. running on battery
 - 🔄 **Auto-Refresh** - Checks battery status every 30 seconds automatically
-- 🚀 **Startup Option** - Configure the app to run automatically when Windows starts
-- 📊 **Firmware Info** - Check the current firmware version of your mouse
-- 💪 **Lightweight** - Minimal resource usage, runs quietly in the system tray
+- 📊 **Status Menu** - Right-click context menu shows mouse name and current battery percentage
+- 🔧 **Firmware Version** - Check the current firmware version of your mouse
+- 🚀 **Startup Integration** - Toggle automatic startup with Windows
+- 💪 **Lightweight & Minimal** - No windows, runs quietly in system tray with minimal resource usage
+- 🔌 **Multi-Mouse Support** - Supports multiple Glorious mouse models with centralized, extensible configuration
 
 ## System Requirements
 
 - Windows 10/11
-- Glorious Model D2 Pro Wireless mouse (also supports Model O Wired and Model O Wireless)
+- One of the following Glorious gaming mice:
+  - Model O Wired
+  - Model O Wireless
+  - Model O PRO Wireless
+  - Model D 2 PRO Wireless
 - WebView2 Runtime (usually pre-installed on Windows 11)
 
 ## Installation
@@ -41,29 +48,34 @@ A lightweight Windows system tray application that monitors the battery level of
 ## Usage
 
 Once running, the application will:
-1. **Appear in the system tray** with a battery icon
-2. **Update the icon** based on battery level:
-   - 🔴 Red: 0-25% battery
-   - 🟠 Orange: 26-50% battery
-   - 🟡 Yellow: 51-75% battery
-   - 🟢 Green: 76-100% battery
-   - ⚡ Lightning bolt: Charging
-   - ❓ Gray: Mouse not found/unknown status
+1. **Appear in the system tray** with a battery percentage displayed as text (e.g., "68", "100")
+2. **Automatically detect your mouse model** and display the correct name
+3. **Update the percentage** every 30 seconds automatically
+4. **Display status information** in tooltips and context menu
 
-### System Tray Menu
+### System Tray Display
+
+The tray icon shows:
+- **Battery percentage** as large, readable text (e.g., "68" for 68%, "100" for fully charged)
+- **Status indicators**: "ZZZ" when mouse is asleep, "N/A" when not found, "???" for unknown status
+- **Text-only display** for maximum readability in the system tray
+
+### Context Menu (Right-Click)
 
 Right-click the tray icon to access:
-- **Refresh** - Manually update battery status
-- **Show Firmware Version** - Display current mouse firmware
-- **Run at Startup** - Toggle automatic startup with Windows
+- **Status Display** (top of menu) - Shows mouse model name and current battery percentage (e.g., "Model D 2 PRO Wireless: 68%")
+- **Refresh** - Manually update battery status immediately
+- **Show Firmware Version** - Display current mouse firmware version in a notification
+- **Run at Startup** - Toggle automatic startup with Windows (checkmark indicates if enabled)
 - **Exit** - Close the application
 
-### Tooltip
+### Tooltip (Hover)
 
 Hover over the tray icon to see:
+- Mouse model name (e.g., "Model D 2 PRO Wireless")
 - Current battery percentage
-- Charging status
-- Device connection status
+- Charging status (if charging)
+- Connection status
 
 ## Building from Source
 
@@ -94,8 +106,11 @@ Installers will be in `target\release\bundle\`
 ### Supported Devices
 - **Glorious Model O Wired** (Product ID: 0x2011)
 - **Glorious Model O Wireless** (Product ID: 0x2022)
-- **Glorious Model D2 Pro Wireless** (Product ID: 0x2034)
-- Vendor ID: 0x258A
+- **Glorious Model O PRO Wireless** (Product ID: 0x2027)
+- **Glorious Model D 2 PRO Wireless** (Product ID: 0x2034)
+- Vendor ID: 0x258A (Glorious Gaming)
+
+**Note**: Adding support for new mouse models is simple - just add a configuration entry. See the source code for details.
 
 ### Battery Status Detection
 The application uses HID (Human Interface Device) feature reports to communicate with the mouse:
@@ -105,9 +120,18 @@ The application uses HID (Human Interface Device) feature reports to communicate
 
 ### Architecture
 - **Backend**: Rust with Tauri framework
-- **HID Communication**: hidapi library
-- **Async Runtime**: Tokio for periodic updates
+- **HID Communication**: hidapi library (version 2.6) for USB device communication
+- **Async Runtime**: Tokio for periodic battery checks every 30 seconds
 - **System Integration**: Windows system tray via tray-icon
+- **Text Rendering**: Dynamic icon generation with text using imageproc and ab_glyph
+- **Configuration**: Centralized mouse configuration for easy extensibility
+
+### Extensibility
+
+The application uses a centralized configuration system. To add support for a new Glorious mouse model, simply add a new entry to the `SUPPORTED_MICE` array in the source code. The app will automatically:
+- Detect the new mouse model by product ID
+- Display the correct name in tooltips and menus
+- Handle wired/wireless detection correctly
 
 ## Troubleshooting
 
@@ -161,10 +185,15 @@ This project is provided as-is for personal use. Not officially affiliated with 
 
 ## Changelog
 
-### Version 0.1.0 (Initial Release)
-- Battery level monitoring with 30-second refresh
-- Dynamic battery icons (0-25%, 26-50%, 51-75%, 76-100%, charging)
-- Firmware version display
+### Version 0.1.0 (Current Release)
+- Text-based battery percentage display in system tray for maximum readability
+- Automatic mouse model detection and dynamic name display
+- Real-time battery monitoring with 30-second automatic refresh
+- Context menu with mouse status, refresh, firmware info, and startup toggle
+- Support for multiple Glorious mouse models:
+  - Model O Wireless
+  - Model O PRO Wireless
+  - Model D 2 PRO Wireless
 - Windows startup integration
-- System tray interface
-- Support for Model O and Model D2 Pro mice
+- System tray-only interface (no windows)
+- Centralized configuration system for easy extensibility

@@ -1,0 +1,159 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v0.1.0, v1.0.0, etc.
+  workflow_dispatch:  # Allow manual triggering from Actions tab
+
+jobs:
+  build-windows:
+    name: Build Windows Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Setup Node.js (for Tauri CLI if needed)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0"
+
+      - name: Prepare build environment
+        shell: pwsh
+        run: |
+          # Ensure the dist folder exists with placeholder HTML
+          if (!(Test-Path "dist")) {
+            New-Item -ItemType Directory -Path "dist" | Out-Null
+            Set-Content -Path "dist\index.html" -Value "<!DOCTYPE html><html><head><title>Placeholder</title></head><body></body></html>"
+          }
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Tauri App
+        shell: pwsh
+        run: cargo tauri build --bundles msi,nsis
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Upload MSI Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-installer
+          path: target/release/bundle/msi/*.msi
+          retention-days: 30
+
+      - name: Upload NSIS Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsis-installer
+          path: target/release/bundle/nsis/*.exe
+          retention-days: 30
+
+      - name: Upload Portable Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-exe
+          path: target/release/model-d2-pro-battery.exe
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-windows
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tags
+
+      - name: Download MSI Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: msi-installer
+          path: dist/installers/
+
+      - name: Download NSIS Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: nsis-installer
+          path: dist/installers/
+
+      - name: Download Portable Executable
+        uses: actions/download-artifact@v4
+        with:
+          name: portable-exe
+          path: dist/portable/
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Glorious Mouse Battery Monitor ${{ steps.get_version.outputs.version }}
+          files: |
+            dist/installers/*.msi
+            dist/installers/*.exe
+            dist/portable/*.exe
+          body: |
+            ## Glorious Mouse Battery Monitor ${{ steps.get_version.outputs.version }}
+
+            ### Installation Options
+
+            1. **MSI Installer** (Recommended)
+               - Download the `.msi` file and run the installer
+               - Automatic installation and start menu integration
+
+            2. **NSIS Installer**
+               - Download the `-setup.exe` file and run the installer
+               - Alternative installer format
+
+            3. **Portable Version**
+               - Download the `.exe` file and run directly
+               - No installation required
+
+            ### Supported Mice
+            - Model O Wireless
+            - Model O PRO Wireless
+            - Model D 2 PRO Wireless
+
+            ### Features
+            - Real-time battery monitoring with text display in system tray
+            - Automatic mouse model detection
+            - 30-second automatic refresh
+            - Context menu with status, refresh, firmware info, and startup toggle
+
+            See [README.md](README.md) for more information.
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
