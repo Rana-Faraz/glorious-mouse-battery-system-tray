@@ -3,39 +3,23 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # Trigger on version tags like v0.1.0, v1.0.0, etc.
-  workflow_dispatch:  # Allow manual triggering from Actions tab
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  publish-tauri:
-    name: Build and Publish Release
-    permissions:
-      contents: write  # Required to create releases and upload assets
+  build:
+    name: Build Windows EXE
     runs-on: windows-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-
-      - name: Prepare build environment
-        shell: pwsh
-        run: |
-          # Ensure the dist folder exists with placeholder HTML
-          # Required by tauri.conf.json frontendDist setting
-          if (!(Test-Path "dist")) {
-            New-Item -ItemType Directory -Path "dist" | Out-Null
-            Set-Content -Path "dist\index.html" -Value "<!DOCTYPE html><html><head><title>Placeholder</title></head><body></body></html>"
-          }
+          components: rustfmt, clippy
 
       - name: Cache Rust dependencies
         uses: actions/cache@v4
@@ -50,40 +34,53 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Build and Release with Tauri Action
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
+
+      - name: Build release executable
+        run: cargo build --release
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Glorious Mouse Battery Monitor ${{ github.ref_name }}'
-          releaseBody: |
+          name: model-d2-pro-battery-windows-x64
+          path: target/release/model-d2-pro-battery.exe
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    permissions:
+      contents: write
+    runs-on: windows-latest
+
+    steps:
+      - name: Download executable artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: model-d2-pro-battery-windows-x64
+          path: release
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/model-d2-pro-battery.exe
+          name: Glorious Mouse Battery Monitor ${{ github.ref_name }}
+          body: |
             ## Glorious Mouse Battery Monitor ${{ github.ref_name }}
 
-            ### Installation Options
+            Download and run `model-d2-pro-battery.exe`.
 
-            1. **MSI Installer** (Recommended)
-               - Download the `.msi` file and run the installer
-               - Automatic installation and start menu integration
-
-            2. **NSIS Installer**
-               - Download the `-setup.exe` file and run the installer
-               - Alternative installer format
-
-            ### Supported Mice
-            - Model O Wireless
-            - Model O PRO Wireless
-            - Model D 2 PRO Wireless
-
-            ### Features
-            - Real-time battery monitoring with text display in system tray
-            - Automatic mouse model detection
+            Features:
+            - Native Rust Windows tray application
+            - Real-time battery monitoring with text display in the system tray
+            - Automatic and manual mouse selection
             - 30-second automatic refresh
-            - Context menu with status, refresh, firmware info, and startup toggle
-
-            See [README.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) for more information.
-          releaseDraft: false
+            - Startup toggle backed by the Windows user registry
           prerelease: ${{ contains(github.ref_name, '-') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          args: --bundles msi,nsis
-          projectPath: .
-          tauriScript: cargo tauri

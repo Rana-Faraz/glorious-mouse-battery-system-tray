@@ -1,3 +1,28 @@
-[workspace]
-members = ["src-tauri"]
-resolver = "2"
+[package]
+name = "model-d2-pro-battery"
+version = "0.2.0"
+description = "Windows tray battery monitor for Glorious mice"
+authors = ["you"]
+edition = "2021"
+
+[[bin]]
+name = "model-d2-pro-battery"
+path = "src/main.rs"
+
+[dependencies]
+ab_glyph = "0.2.32"
+directories = "6.0.0"
+hidapi = "2.6"
+image = { version = "0.25", features = ["png"] }
+imageproc = "0.25.0"
+serde = { version = "1", features = ["derive"] }
+single-instance = "0.3.3"
+toml = "0.9.10"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tray-icon = { version = "0.24", default-features = false }
+winit = "=0.30.12"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
